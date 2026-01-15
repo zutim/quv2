@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地量化选股平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .tab-container {
+            margin-bottom: 20px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #e9ecef;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .tab-button.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .chart-container {
+            height: 400px;
+            margin-top: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .backtest-summary {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .summary-item {
+            display: inline-block;
+            margin-right: 30px;
+            font-weight: bold;
+        }
+
+        .trade-type-buy {
+            color: red;
+        }
+
+        .trade-type-sell {
+            color: green;
+        }
+
+        .trade-profit-positive {
+            color: red;
+        }
+
+        .trade-profit-negative {
+            color: green;
+        }
+        
+        .data-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #e8f4f8;
+            border-radius: 5px;
+        }
+        
+        .status-display {
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>本地量化选股平台</h1>
+
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <div class="tab-button active" onclick="switchTab('data')">数据管理</div>
+                <div class="tab-button" onclick="switchTab('screener')">股票筛选</div>
+                <div class="tab-button" onclick="switchTab('backtest')">策略回测</div>
+            </div>
+
+            <div id="data-tab" class="tab-content">
+                <h2>数据管理</h2>
+                
+                <div class="data-controls">
+                    <div class="control-group">
+                        <label>数据状态:</label>
+                        <div id="data-status" class="status-display">点击"刷新状态"获取数据信息</div>
+                    </div>
+                    <div class="control-group">
+                        <button onclick="refreshDataStatus()">🔄 刷新状态</button>
+                    </div>
+                    <div class="control-group">
+                        <button onclick="updateTodayData()" style="background-color: #28a745;">📈 增量更新今日数据</button>
+                    </div>
+                    <div class="control-group">
+                        <button onclick="generateStockPool()" style="background-color: #ffc107; color: #212529;">📊 生成股票池</button>
+                    </div>
+                    <div class="control-group">
+                        <button onclick="repairMissingData()" style="background-color: #dc3545; color: white;">🔧 修复缺失数据</button>
+                    </div>
+                </div>
+
+                <div id="data-loading" class="loading" style="display: none;">
+                    正在处理数据，请稍候...
+                </div>
+            </div>
+
+            <div id="screener-tab" class="tab-content">
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="screener_date">选股日期:</label>
+                        <input type="date" id="screener_date" value="2025-12-01">
+                    </div>
+                    <div class="control-group">
+                        <label for="min_price">最低价格:</label>
+                        <input type="number" id="min_price" value="0" step="0.01">
+                    </div>
+                    <div class="control-group">
+                        <label for="max_price">最高价格:</label>
+                        <input type="number" id="max_price" value="9999" step="0.01">
+                    </div>
+                    <div class="control-group">
+                        <label for="strategy">选股策略:</label>
+                        <select id="strategy">
+                            <option value="verified" selected>✅ 验证策略 (Hybrid: 实时/回测)</option>
+                            <option value="all">全部</option>
+                            <option value="high_open">首板高开 (旧版)</option>
+                            <option value="low_open">首板低开 (旧版)</option>
+                            <option value="weak_to_strong">弱势转强势 (旧版)</option>
+                            <option value="mixed">混合策略 (旧版)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <button onclick="screenStocks()">开始选股</button>
+                    </div>
+                    <div class="control-group">
+                        <button onclick="fastScreenStocks()" style="background-color: #28a745;">🚀 快速选股</button>
+                    </div>
+                </div>
+
+                <div id="screener-loading" class="loading" style="display: none;">
+                    正在筛选股票，请稍候...
+                </div>
+
+                <div class="results">
+                    <h3>选股结果</h3>
+                    <div id="results-count"></div>
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th>股票代码</th>
+                                <th>股票名称</th>
+                                <th>当前价格</th>
+                                <th>选股策略</th>
+                                <th>性能</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="backtest-tab" class="tab-content">
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="backtest_start_date">开始日期:</label>
+                        <input type="date" id="backtest_start_date" value="2025-01-01">
+                    </div>
+                    <div class="control-group">
+                        <label for="backtest_end_date">结束日期:</label>
+                        <input type="date" id="backtest_end_date" value="2025-12-31">
+                    </div>
+                    <div class="control-group">
+                        <label for="backtest_strategy">回测策略:</label>
+                        <select id="backtest_strategy">
+                            <option value="verified" selected>✅ 验证策略 (Hybrid: 实时/回测)</option>
+                            <option value="mixed">混合策略（旧版）</option>
+                            <option value="high_open">首板高开（旧版）</option>
+                            <option value="low_open">首板低开（旧版）</option>
+                            <option value="weak_to_strong">弱势转强势（旧版）</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="initial_capital">初始资金:</label>
+                        <input type="number" id="initial_capital" value="100000" step="1000">
+                    </div>
+                    <div class="control-group">
+                        <button onclick="runBacktest()">开始回测</button>
+                    </div>
+                </div>
+
+                <div id="backtest-loading" class="loading" style="display: none;">
+                    正在进行回测，请稍候...
+                </div>
+
+                <div id="backtest-results" style="display: none;">
+                    <div class="backtest-summary">
+                        <div class="summary-item">初始资金: <span id="initial-capital-value"></span></div>
+                        <div class="summary-item">最终价值: <span id="final-value"></span></div>
+                        <div class="summary-item">总收益率: <span id="total-return"></span>%</div>
+                    </div>
+
+                    <h3>交易记录</h3>
+                    <table id="trades-table">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>股票代码</th>
+                                <th>股票名称</th>
+                                <th>操作</th>
+                                <th>价格</th>
+                                <th>股数</th>
+                                <th>金额</th>
+                                <th>策略/原因</th>
+                                <th>盈亏</th>
+                                <th>盈亏%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-body">
+                        </tbody>
+                    </table>
+
+                    <h3>资产变化曲线</h3>
+                    <div class="chart-container">
+                        <canvas id="portfolio-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换标签页
+        function switchTab(tabName) {
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // 取消激活所有按钮
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // 激活选中的标签
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // 获取数据状态
+        async function refreshDataStatus() {
+            const statusDiv = document.getElementById('data-status');
+            const loading = document.getElementById('data-loading');
+            
+            loading.style.display = 'block';
+            statusDiv.textContent = '正在获取数据状态...';
+
+            try {
+                const response = await fetch('/api/data_status');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    statusDiv.innerHTML = `
+                        <strong>📊 数据状态:</strong> ${data.message}<br>
+                        <strong>📅 最新日期:</strong> ${data.latest_date}<br>
+                        <strong>📈 股票数量:</strong> ${data.total_stocks} 只
+                    `;
+                } else {
+                    statusDiv.textContent = `❌ 获取数据状态失败: ${data.message}`;
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ 获取数据状态时出错: ${error.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 增量更新今日数据
+        async function updateTodayData() {
+            const statusDiv = document.getElementById('data-status');
+            const loading = document.getElementById('data-loading');
+            
+            loading.style.display = 'block';
+            statusDiv.innerHTML = '<strong>🔄 正在增量更新今日数据，请稍候...</strong>';
+
+            try {
+                const response = await fetch('/api/update_today_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    statusDiv.innerHTML = `
+                        <strong>✅ ${data.message}</strong><br>
+                        成功更新: ${data.success_count} 只股票<br>
+                        更新失败: ${data.fail_count} 只股票
+                    `;
+                } else {
+                    statusDiv.innerHTML = `<strong>❌ 更新失败:</strong> ${data.message}`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<strong>❌ 更新数据时出错:</strong> ${error.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 生成股票池
+        async function generateStockPool() {
+            const statusDiv = document.getElementById('data-status');
+            const loading = document.getElementById('data-loading');
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            loading.style.display = 'block';
+            statusDiv.innerHTML = '<strong>🔄 正在生成股票池，请稍候...</strong>';
+
+            try {
+                const response = await fetch('/api/generate_stock_pool', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ date: today })
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const poolData = data.pool_data;
+                    statusDiv.innerHTML = `
+                        <strong>✅ 股票池生成成功!</strong><br>
+                        目标日期: ${poolData.target_date}<br>
+                        前一交易日: ${poolData.prev_trading_date}<br>
+                        前前交易日: ${poolData.prev_2_trading_date}<br>
+                        前一日涨停股票数: ${poolData.limit_up_stocks.length}<br>
+                        首板股票数: ${poolData.first_board_stocks.length}<br>
+                        生成时间: ${poolData.generated_at}
+                    `;
+                } else {
+                    statusDiv.innerHTML = `<strong>❌ 生成股票池失败:</strong> ${data.message}`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<strong>❌ 生成股票池时出错:</strong> ${error.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 修复缺失数据
+        async function repairMissingData() {
+            const statusDiv = document.getElementById('data-status');
+            const loading = document.getElementById('data-loading');
+            
+            if (!confirm('确定要修复所有缺失的股票数据吗？这可能需要一些时间。')) {
+                return;
+            }
+            
+            loading.style.display = 'block';
+            statusDiv.innerHTML = '<strong>🔄 正在修复缺失数据，请稍候...</strong><br>此过程可能需要几分钟时间，请耐心等待。';
+
+            try {
+                const response = await fetch('/api/repair_missing_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    statusDiv.innerHTML = `
+                        <strong>✅ 数据修复完成!</strong><br>
+                        ${data.message}<br>
+                        修复股票数: ${data.repaired_count}<br>
+                        处理总数: ${data.total_processed}
+                    `;
+                } else {
+                    statusDiv.innerHTML = `<strong>❌ 数据修复失败:</strong> ${data.message}`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<strong>❌ 修复数据时出错:</strong> ${error.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        async function screenStocks() {
+            const screenerDate = document.getElementById('screener_date').value;
+            const minPrice = parseFloat(document.getElementById('min_price').value) || 0;
+            const maxPrice = parseFloat(document.getElementById('max_price').value) || 9999;
+            const strategy = document.getElementById('strategy').value;
+
+            const loading = document.getElementById('screener-loading');
+            const resultsBody = document.getElementById('results-body');
+            const resultsCount = document.getElementById('results-count');
+
+            loading.style.display = 'block';
+            resultsBody.innerHTML = '';
+            resultsCount.textContent = '';
+
+            try {
+                let url = '/api/screen_stocks';
+                let body = {
+                    date: screenerDate,
+                    min_price: minPrice,
+                    max_price: maxPrice,
+                    strategy: strategy
+                };
+
+                // Use verified strategy endpoint if selected
+                if (strategy === 'verified') {
+                    url = '/api/run_verified_strategy';
+                    body = { date: screenerDate };
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                resultsCount.textContent = `找到 ${data.length} 只符合条件的股票`;
+
+                data.forEach(stock => {
+                    const row = document.createElement('tr');
+                    // 修复toFixed错误，确保价格是数字
+                    const price = stock.price !== undefined ? parseFloat(stock.price) : 0;
+                    const displayPrice = !isNaN(price) && price > 0 ? price.toFixed(2) : 'N/A';
+                    row.innerHTML = `
+                        <td>${stock.code}</td>
+                        <td>${stock.name}</td>
+                        <td>${displayPrice}</td>
+                        <td>${stock.strategy}</td>
+                        <td>-</td>
+                    `;
+                    resultsBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('选股出错:', error);
+                resultsCount.textContent = `选股出错: ${error.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        async function fastScreenStocks() {
+            const screenerDate = document.getElementById('screener_date').value;
+
+            const loading = document.getElementById('screener-loading');
+            const resultsBody = document.getElementById('results-body');
+            const resultsCount = document.getElementById('results-count');
+
+            loading.style.display = 'block';
+            resultsBody.innerHTML = '';
+            resultsCount.textContent = '';
+
+            try {
+                const response = await fetch('/api/fast_screen_stocks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        date: screenerDate
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // 显示汇总信息
+                const summary = data.summary || {};
+                resultsCount.textContent = `快速选股完成！共选出 ${summary.total_selected} 只股票 (首板高开: ${summary.sbgk_count}, 首板低开: ${summary.sbdk_count}, 弱转强: ${summary.rzq_count}), 耗时: ${summary.execution_time.toFixed(2)}秒`;
+
+                // 显示股票结果
+                (data.stocks || []).forEach(stock => {
+                    const row = document.createElement('tr');
+                    const price = stock.price !== undefined ? parseFloat(stock.price) : 0;
+                    const displayPrice = !isNaN(price) && price > 0 ? price.toFixed(2) : 'N/A';
+                    row.innerHTML = `
+                        <td>${stock.code}</td>
+                        <td>${stock.name}</td>
+                        <td>${displayPrice}</td>
+                        <td>${stock.strategy}</td>
+                        <td>${stock.performance || '-'}</td>
+                    `;
+                    resultsBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('快速选股出错:', error);
+                resultsCount.textContent = `快速选股出错: ${error.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        async function runBacktest() {
+            const startDate = document.getElementById('backtest_start_date').value;
+            const endDate = document.getElementById('backtest_end_date').value;
+            const strategy = document.getElementById('backtest_strategy').value;
+            const initialCapital = document.getElementById('initial_capital').value;
+
+            const loading = document.getElementById('backtest-loading');
+            const resultsDiv = document.getElementById('backtest-results');
+            const tradesBody = document.getElementById('trades-body');
+
+            loading.style.display = 'block';
+            resultsDiv.style.display = 'none';
+            tradesBody.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/backtest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        start_date: startDate,
+                        end_date: endDate,
+                        strategy: strategy,
+                        initial_capital: initialCapital
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // 显示回测结果摘要
+                document.getElementById('initial-capital-value').textContent = parseFloat(data.initial_capital).toLocaleString();
+                document.getElementById('final-value').textContent = parseFloat(data.final_value).toLocaleString();
+                document.getElementById('total-return').textContent = parseFloat(data.total_return).toFixed(2);
+
+                // 显示交易记录
+                data.trades.forEach(trade => {
+                    const row = document.createElement('tr');
+                    const tradeTypeClass = trade.type === 'buy' ? 'trade-type-buy' : 'trade-type-sell';
+                    const profitClass = trade.profit ? (trade.profit >= 0 ? 'trade-profit-positive' : 'trade-profit-negative') : '';
+
+                    // 修复toFixed错误，确保数值是数字
+                    const price = !isNaN(parseFloat(trade.price)) ? parseFloat(trade.price).toFixed(2) : 'N/A';
+                    const amount = !isNaN(parseFloat(trade.amount)) ? parseFloat(trade.amount).toFixed(2) : 'N/A';
+                    const shares = trade.shares || 0;
+
+                    let profitDisplay = '—';
+                    let profitRatioDisplay = '—';
+                    if (typeof trade.profit !== 'undefined' && !isNaN(parseFloat(trade.profit))) {
+                        profitDisplay = parseFloat(trade.profit).toFixed(2);
+                    }
+                    if (typeof trade.profit_ratio !== 'undefined' && !isNaN(parseFloat(trade.profit_ratio))) {
+                        profitRatioDisplay = parseFloat(trade.profit_ratio).toFixed(2) + '%';
+                    }
+
+                    row.innerHTML = `
+                        <td>${trade.date}</td>
+                        <td>${trade.code}</td>
+                        <td>${trade.name}</td>
+                        <td class="${tradeTypeClass}">${trade.type === 'buy' ? '买入' : '卖出'}</td>
+                        <td>${price}</td>
+                        <td>${shares}</td>
+                        <td>${amount}</td>
+                        <td>${trade.strategy}</td>
+                        <td class="${profitClass}">${profitDisplay}</td>
+                        <td class="${profitClass}">${profitRatioDisplay}</td>
+                    `;
+                    tradesBody.appendChild(row);
+                });
+
+                // 显示资产变化图表
+                if (data.portfolio_values && data.portfolio_values.length > 0) {
+                    const dates = data.portfolio_values.map(item => item.date);
+                    const values = data.portfolio_values.map(item => parseFloat(item.value));
+
+                    const ctx = document.getElementById('portfolio-chart').getContext('2d');
+                    if (window.portfolioChart) {
+                        window.portfolioChart.destroy();
+                    }
+                    window.portfolioChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dates,
+                            datasets: [{
+                                label: '资产价值',
+                                data: values,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: false
+                                }
+                            }
+                        }
+                    });
+                }
+
+                resultsDiv.style.display = 'block';
+            } catch (error) {
+                console.error('回测出错:', error);
+                alert(`回测出错: ${error.message}`);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 页面加载时设置默认日期
+        document.addEventListener('DOMContentLoaded', function () {
+            // 设置默认日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+            const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
+
+            document.getElementById('screener_date').value = today;
+            document.getElementById('backtest_start_date').value = oneYearAgoStr;
+            document.getElementById('backtest_end_date').value = today;
+            
+            // 默认显示数据管理标签
+            switchTab('data');
+        });
+    </script>
+</body>
+
+</html>
