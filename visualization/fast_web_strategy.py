@@ -12,7 +12,7 @@ from optimized_tdx_handler import get_call_auction_data, get_call_auction_batch_
 
 class FastWebStrategySelector:
     def __init__(self):
-        self.data_path = os.path.join(os.path.dirname(__file__), 'full_stock_data', 'daily_data')
+        self.data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'full_stock_data', 'daily_data')
         self.auction_data_cache = {}  # 竞价数据缓存
 
     def get_stock_name(self, stock_code):

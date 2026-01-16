@@ -1,369 +1,185 @@
-# 基于AkShare的本地量化选股平台
+# 量化选股系统 v2
 
-## 项目概述
-
-本项目成功将原聚宽平台的"首板高开-低开-弱转强混合策略"转换为基于AkShare的本地量化选股平台。实现了数据本地化存储和策略验证，解决了API调用限制问题。
+基于AkShare的本地量化选股平台，支持股票池生成、数据更新、选股和可视化功能。
 
 ## 核心功能
 
-### 1. 选股策略
-- **首板高开**: 寻找涨停后高开的股票
-- **首板低开**: 寻找涨停后低开的股票  
-- **弱转强**: 寻找曾经涨停但未封板，随后转强的股票
+- **股票池生成**：生成每日涨停股票池
+- **数据更新**：更新股票日线数据
+- **智能选股**：基于涨停板策略的选股算法（使用select_2026_01_12.py）
+- **市值管理**：股票市值数据管理
+- **可视化界面**：Web界面进行交互式选股
 
-### 2. 数据本地化
-- **SQLite数据库**: 存储股票列表、基本信息和更新日志
-- **CSV文件**: 存储股票日线数据
-- **离线访问**: 无需依赖实时API调用
+## 环境安装
 
-### 3. 策略验证
-- **回测功能**: 验证历史数据选股结果
-- **对比分析**: 与原聚宽策略逻辑一致性验证
-- **性能优化**: 本地数据访问速度提升
-
-## 全市场数据下载
-
-### 批量下载所有A股股票日线数据
-
-项目包含了批量下载全市场股票数据的功能：
-
-```bash
-# 下载全市场股票数据（数据量大，请耐心等待）
-python download_full_data.py
-
-# 或者先进行小规模测试
-python download_full_data.py  # 选择y并输入较小的数量如100
-```
-
-### 增量下载新数据
-
-当您之前已经下载过数据，只需下载新日期的数据时，使用增量下载：
-
-```bash
-# 增量更新，只下载最新数据，避免重复下载
-python incremental_download.py
-```
-
-增量下载功能：
-- 自动识别已有的数据文件
-- 只下载缺失的数据或新日期的数据
-- 合并到现有数据文件中
-- 避免重复下载已有的数据
-
-### 数据统计和分析
-
-```bash
-# 查看已下载数据的统计信息
-python data_analyzer.py
-```
-
-### 数据结构
-
-下载的数据包含以下字段：
-- `date`: 日期
-- `open`: 开盘价
-- `close`: 收盘价
-- `high`: 最高价
-- `low`: 最低价
-- `volume`: 成交量
-- `amount`: 成交额
-
-### 数据存储位置
-
-- **CSV文件**: `full_stock_data/daily_data/` 目录下，每个股票一个CSV文件
-- **SQLite数据库**: `full_stock_data/stock_data.db`，包含股票列表和下载日志
-
-### 使用下载的数据
-
-下载完成后，您可以使用这些数据进行：
-1. **策略回测**: 验证选股策略的历史表现
-2. **数据分析**: 进行各种统计分析
-3. **模型训练**: 用于机器学习模型训练
-4. **风险评估**: 评估策略风险指标
-
-## 当前进度
-
-截至2026年1月6日，已下载股票数据：**655只**（约12.6%）
-
-下载进程正在后台运行，预计总股票数量约4800+只（不包括B股、科创板等），数据期间为约2年历史数据。
-
-## 回测系统说明
-
-### 什么是回测
-
-回测（Backtesting）是量化投资中的重要概念，它是指使用历史数据来测试交易策略的过程。简单来说，就是把你的选股策略应用到过去的历史数据上，看看如果在过去按照这个策略操作，会得到什么样的收益结果。
-
-### 回测的重要性
-
-1. **验证策略有效性**：确认策略在历史上是否有效
-2. **评估风险收益特征**：了解策略的收益、风险和最大回撤
-3. **参数优化**：调整策略参数以获得更好的历史表现
-4. **建立信心**：在实盘交易前验证策略逻辑
-
-### 回测系统组成
-
-1. **数据源**：历史价格数据（开盘价、收盘价、最高价、最低价、成交量等）
-2. **策略逻辑**：选股条件和买卖规则
-3. **交易引擎**：模拟买入卖出操作
-4. **资金管理**：现金和持仓管理
-5. **绩效评估**：收益率、风险等指标计算
-
-### 本项目回测系统特点
-
-- **本地数据**：使用本地SQLite和CSV数据，避免API限制
-- **真实模拟**：包含手续费、资金分配等真实交易因素
-- **灵活配置**：可调整初始资金、手续费率等参数
-- **详细分析**：提供收益率、最大回撤等关键指标
-
-### 如何使用回测系统
-
-```bash
-# 运行回测演示
-python backtest_engine.py
-```
-
-### 回测结果解读
-
-- **总收益率**：整个回测期间的总收益百分比
-- **年化收益率**：将总收益率折算为年化收益率
-- **最大回撤**：回测期间资产价值从最高点到最低点的跌幅
-- **交易次数**：买卖操作的总次数
-- **胜率**：盈利交易占总交易的比例
-
-### 注意事项
-
-1. **避免过拟合**：不要过度优化参数以适应历史数据
-2. **样本外测试**：在未用于优化的数据上验证策略
-3. **交易成本**：考虑实际交易中的手续费和滑点
-4. **市场变化**：历史表现不代表未来结果
-
-## 文件结构
-
-```
-quantv2/
-├── aa.py                    # 原聚宽策略代码
-├── quant_system_local.py    # 完整本地量化系统
-├── stock_selector_local.py  # 选股核心逻辑实现
-├── quick_demo.py           # 快速演示版本
-├── test_minimal.py         # 最小化功能测试
-├── strategy_verification.py # 策略验证脚本
-├── local_data_manager.py   # 本地数据管理模块
-├── local_stock_selector.py # 本地选股验证模块
-├── quick_data_fetcher.py   # 快速数据获取脚本
-├── strategy_comparison.py  # 策略对比分析
-├── backtest_engine.py      # 回测系统
-├── backtest_tutorial.py    # 回测教程
-├── download_full_data.py   # 全市场数据下载
-├── incremental_download.py # 增量数据下载
-├── data_analyzer.py        # 数据分析工具
-├── data_usage_example.py   # 数据使用示例
-├── incremental_guide.py    # 增量下载指南
-├── check_progress.py       # 进度检查工具
-├── run_full_system.py      # 完整系统执行脚本
-├── LOCALIZATION_SUMMARY.md # 本地化总结报告
-├── SUMMARY.md              # 项目总结报告
-├── README.md               # 本说明文件
-└── stock_data/             # 本地数据目录
-    ├── stock_data.db       # SQLite数据库
-    └── daily_data/         # 日线数据CSV文件
-```
-
-## 策略逻辑详解
-
-### 首板高开选股条件
-1. 均价增益值 ≥ 7%，成交额在5.5-20亿之间
-2. 开盘比例在1.00-1.06之间（高开）
-3. 成交量相对于前期高点有放大（左压确认）
-
-### 首板低开选股条件  
-1. 相对位置 ≤ 50%，成交额 ≥ 1亿
-2. 开盘比例在0.955-0.97之间（低开3%-4.5%）
-
-### 弱转强选股条件
-1. 前三日涨幅 ≤ 28%，前日收盘相对开盘跌幅 < 5%
-2. 均价增益值 ≥ -4%，成交额在3-19亿之间
-3. 开盘比例在0.98-1.09之间
-4. 成交量放大确认
-
-## 使用方法
-
-### 环境准备
 ```bash
 # 创建并激活虚拟环境
 python3 -m venv quant_env
 source quant_env/bin/activate
 
 # 安装依赖
-python -m pip install akshare pandas numpy matplotlib
+pip install -r requirements.txt
+# 或单独安装
+pip install akshare pandas numpy flask requests
 ```
 
-### 运行完整系统
+## 主要命令
+
+### 1. 更新股票日线数据
+
 ```bash
-# 运行完整流程演示
-python run_full_system.py
+# 智能更新（推荐）- 只更新涨停/破板股票
+python update_data_smart.py
+
+# 增量更新 - 更新所有股票的最新数据
+cd data_processing && python incremental_download.py
 ```
 
-### 单独运行模块
+### 2. 生成股票池数据
+
 ```bash
-# 获取数据
-python quick_data_fetcher.py
+# 生成指定日期的股票池数据
+cd data_processing && python stock_pool_generator.py
 
-# 选股验证
-python local_stock_selector.py
-
-# 回测系统
-python backtest_engine.py
-
-# 策略对比分析
-python strategy_comparison.py
-
-# 下载全市场数据
-python download_full_data.py
-
-# 增量下载新数据
-python incremental_download.py
-
-# 分析已下载数据
-python data_usage_example.py
-
-# 检查下载进度
-python check_progress.py
+# 按提示选择单日或批量生成
 ```
 
-## 数据本地化优势
+### 3. 执行选股（仅使用select_2026_01_12.py）
 
-1. **无API限制**: 本地存储避免了API调用频率限制
-2. **快速访问**: 本地数据库访问速度远超网络API
-3. **离线分析**: 支持无网络连接的数据分析
-4. **数据复用**: 历史数据可重复使用，便于回测
-5. **可靠性高**: 不依赖外部服务稳定性
+```bash
+# 按指定日期选股（仅使用select_2026_01_12.py）
+cd selection && python select_2026_01_12.py 2026-01-12
 
-## 策略验证
+# 或直接运行select_2026_01_12.py
+python selection/select_2026_01_12.py <日期>
 
-系统已验证以下方面的一致性：
-- 数据字段映射准确性
-- 算法逻辑一致性  
-- 选股条件完整性
-- 结果可重现性
+# 保留快速选股功能，但所有选股均通过select_2026_01_12.py执行
+```
 
-## 扩展性
+### 4. 数据管理
 
-- **模块化设计**: 各功能模块独立，易于扩展
-- **多数据源**: 支持集成其他数据源
-- **自定义策略**: 易于添加新的选股策略
-- **回测系统**: 支持策略历史验证
+```bash
+# 更新市值数据
+cd data_processing && python get_market_caps.py update
 
-## 总结
+# 获取特定股票市值
+cd data_processing && python get_market_caps.py get <股票代码> <日期>
 
-本项目成功实现了聚宽策略的本地化转换，通过建立本地数据存储系统，解决了API限制问题，并保持了原策略的核心逻辑不变。系统具备完整的数据获取、存储、选股和验证功能，可独立运行且性能优越。
+# 本地数据管理
+cd data_processing && python local_data_manager.py
+```
 
-**当前状态**：数据下载正在进行中，已下载655只股票的数据（约12.6%），预计总共需要下载约4800+只股票。下载完成后，您将拥有完整的A股市场2年历史数据，可用于各种量化分析和策略回测。
+## 可视化功能
 
-# 量化股票分析系统
+### 启动Web界面
 
-这是一个基于A股市场的量化股票分析系统，主要用于识别和筛选满足特定条件的股票，如首板高开、首板低开、弱转强等策略。
+```bash
+# 方法1: 使用启动脚本
+cd visualization
+./start_web.sh
+
+# 方法2: 直接运行
+cd visualization
+python quant_web_app.py
+```
+
+访问地址：`http://127.0.0.1:5007`
+
+### Web界面功能
+- **股票筛选**：支持多种选股策略
+- **数据可视化**：图表展示选股结果
+- **实时监控**：监控股票池变化
+- **历史回测**：回测选股策略效果
+
+### API接口
+- `/api/screen_stocks` - 执行股票筛选
+- `/api/fast_screen_stocks` - 快速股票筛选
+- `/api/trade` - 获取股票竞价数据
+- `/api/data_status` - 获取本地数据状态
+- `/api/update_today_data` - 增量更新今日数据
+- `/api/generate_stock_pool` - 生成股票池
+
+## data_processing中的可视化组件
+
+### 1. 股票池生成器可视化
+- `stock_pool_generator.py` - 生成每日股票池数据
+
+### 2. 数据下载管理
+- `incremental_download.py` - 增量数据下载
+
+### 3. 市值管理
+- `get_market_caps.py` - 市值数据管理
+
+### 4. 本地数据管理
+- `local_data_manager.py` - 本地数据管理
+
+## 完整流程示例
+
+```bash
+# 1. 更新数据（每天收盘后执行）
+python update_data_smart.py
+
+# 2. 生成股票池（使用最新数据）
+cd data_processing && python stock_pool_generator.py
+
+# 3. 启动Web界面进行选股（次日开盘前）
+cd visualization && ./start_web.sh
+
+# 4. 或直接命令行选股（仅使用select_2026_01_12.py）
+python selection/select_2026_01_12.py 2026-01-13
+```
+
+## 数据目录说明
+
+- `full_stock_data/daily_data/` - 股票日线数据（CSV格式）
+- `full_stock_data/pool_data/` - 股票池数据（JSON格式）
+- `data_processing/` - 数据处理模块
+- `selection/` - 选股模块（仅使用select_2026_01_12.py）
+- `visualization/` - 可视化模块
+
+## 选股策略
+
+系统实现以下选股策略：
+
+1. **首板高开**：寻找涨停后高开的股票
+2. **首板低开**：寻找涨停后低开的股票
+3. **弱转强**：寻找曾经涨停但未封板，随后转强的股票
 
 ## 项目结构
 
-项目按照功能划分为以下几个部分：
-
-### 1. 选股模块 (selection/)
-- `select_2026_01_12.py` - 主要选股脚本，使用2026-01-12的股票池数据进行选股
-- `select_today_stocks.py` - 今日股票选择器，使用最新的股票池数据进行选股
-- `enhanced_stock_selector.py` - 增强的股票选股模块，直接使用JSON格式的pool数据进行选股
-- `local_strategy.py` - 本地策略实现，模拟JoinQuant的API
-- `aa.py` - 基于聚宽平台的原始策略代码
-
-### 2. 数据处理模块 (data_processing/)
-- `stock_pool_generator.py` - 股票池生成器，生成指定日期的股票池数据
-- `incremental_download.py` - 增量下载股票数据
-- `local_data_manager.py` - 本地数据管理器，处理数据获取和缓存
-- `quick_data_fetcher.py` - 快速数据获取器
-- `get_market_caps.py` - 获取股票市值数据
-
-### 3. 可视化与Web界面 (visualization/)
-- `quant_web_app.py` - Flask Web应用程序，提供API接口和网页界面
-- `templates/` - HTML模板文件
-- `fast_web_strategy.py` - 优化的Web选股策略
-- `backtest_engine.py` - 回测引擎
-- `run_strategy.sh` - 运行策略的脚本
-- `start_web.sh` - 启动Web服务器的脚本
-
-### 4. 核心组件
-- `local_stock_selector.py` - 本地股票选择器
-- `quant_engine.py` - 量化引擎
-- `optimized_tdx_handler.py` - 优化的TDX处理器，支持批量和并发处理
-- `update_data_smart.py` - 智能更新数据脚本
-
-## 功能特点
-
-1. **首板高开策略**：筛选昨日涨停、今日高开的股票
-2. **首板低开策略**：筛选昨日涨停、今日低开的股票
-3. **弱转强策略**：筛选炸板后转强的股票
-4. **数据缓存**：支持本地数据缓存，减少API调用
-5. **增量更新**：支持增量更新股票数据
-
-## 安装依赖
-
-```bash
-pip install -r requirements.txt
+```
+quantv2/
+├── data_processing/           # 数据处理模块
+│   ├── stock_pool_generator.py    # 股票池生成器
+│   ├── incremental_download.py    # 增量数据下载
+│   ├── get_market_caps.py         # 市值数据管理
+│   └── local_data_manager.py      # 本地数据管理
+├── selection/               # 选股模块
+│   └── select_2026_01_12.py       # 选股主程序（唯一选股文件）
+├── visualization/           # 可视化模块
+│   ├── quant_web_app.py           # Web应用
+│   ├── start_web.sh               # 启动脚本
+│   ├── templates/                 # 前端模板
+│   └── static/                    # 静态资源
+├── full_stock_data/         # 本地数据目录
+│   ├── daily_data/          # 日线数据CSV文件
+│   └── pool_data/           # 股票池数据
+├── update_data_smart.py     # 智能数据更新器
+└── optimized_tdx_handler.py # TDX数据处理器
 ```
 
-## 使用方法
+## 维护命令
 
-1. **生成股票池数据**:
-   ```bash
-   cd data_processing
-   python stock_pool_generator.py
-   ```
+```bash
+# 检查数据完整性
+python -c "from data_processing.local_data_manager import LocalDataManager; dm = LocalDataManager(); print('Latest date:', dm.get_latest_data_date())"
 
-2. **运行选股**:
-   ```bash
-   cd selection
-   python select_2026_01_12.py
-   ```
+# 生成最新股票列表
+python -c "from data_processing.local_data_manager import LocalDataManager; dm = LocalDataManager(); dm.update_stock_list()"
 
-3. **启动Web界面**:
-   ```bash
-   cd visualization
-   python quant_web_app.py
-   ```
+# 运行快速选股验证（仅通过select_2026_01_12.py）
+cd selection && python select_2026_01_12.py 2026-01-12
+```
 
-## 策略逻辑
 
-### 首板高开条件
-1. 昨日涨停，前日未涨停
-2. 均价获利比例 >= 7%
-3. 成交额在5.5亿-20亿之间
-4. 市值 >= 70亿，流通市值 <= 520亿
-5. 集合竞价成交量占比 >= 3%
-6. 开盘价在前收盘价1%-6%之间（高开但未涨停）
-7. 左压条件：涨停日成交量相比前期放大
 
-### 首板低开条件
-1. 昨日涨停，前日未涨停
-2. 低开幅度在3%-4.5%之间
-3. 相对位置 <= 50%
-4. 昨日成交额 >= 1亿
-
-### 弱转强条件
-1. 昨日曾涨停但未封板
-2. 前3日涨幅 <= 28%
-3. 前日跌幅 >= -5%
-4. 竞价比例在合理范围
-5. 成交量占比 >= 3%
-6. 均价涨幅 >= -4%
-7. 成交额在3亿-19亿之间
-8. 左压条件
-
-## 数据来源
-
-- 使用AkShare获取A股实时和历史数据
-- 支持TDX数据源（已禁用，通过API调用）
-- 本地CSV文件缓存
-
-## 注意事项
-
-1. 本系统仅供学习和研究使用，不构成投资建议
-2. 请确保遵守数据提供商的使用条款
-3. 实际投资需谨慎，考虑市场风险

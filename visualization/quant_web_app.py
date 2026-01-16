@@ -281,6 +281,34 @@ def get_strong_stocks(date_str):
         print(f"获取强势股票数据失败 {date_str}: {e}")
         return []
 
+def get_stock_name(stock_code):
+    """获取股票名称"""
+    try:
+        # 尝试获取股票基本信息
+        stock_info = ak.stock_individual_info_em(symbol=stock_code)
+        if stock_info is not None and not stock_info.empty:
+            name_row = stock_info[stock_info['item'] == '股票名称']
+            if not name_row.empty:
+                return name_row['value'].iloc[0]
+        return f"股票{stock_code}"
+    except:
+        return f"股票{stock_code}"
+
+def calculate_technical_indicators(df):
+    """计算技术指标"""
+    # 计算移动平均线等技术指标
+    if len(df) >= 5:
+        df['MA5'] = df['close'].rolling(window=5).mean()
+    if len(df) >= 10:
+        df['MA10'] = df['close'].rolling(window=10).mean()
+    if len(df) >= 20:
+        df['MA20'] = df['close'].rolling(window=20).mean()
+    
+    # 计算涨跌幅
+    df['pct_change'] = df['close'].pct_change()
+    
+    return df
+
 @app.route('/')
 def index():
     """渲染主页"""
@@ -308,19 +336,43 @@ def screen_stocks_by_date(target_date_str, strategy='mixed', max_stocks=200):
         limit_up_stocks_yesterday = get_limit_up_stocks(prev_date_str)
         limit_up_stocks_2_days_ago = get_limit_up_stocks(prev_2_date_str)
         
-        csv_files = glob.glob(os.path.join(DATA_PATH, "*.csv"))
+        # 定义数据路径 - 修正为相对于项目根目录的路径
+        DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'full_stock_data', 'daily_data')
+        
+        # 从股票池加载首板股票，只对这些股票进行筛选以提高性能
+        try:
+            pool_data_dir = os.path.join(os.path.dirname(__file__), 'full_stock_data', 'pool_data')
+            pool_file = os.path.join(pool_data_dir, f"pool_{target_date_str}.json")
+            
+            if os.path.exists(pool_file):
+                with open(pool_file, 'r', encoding='utf-8') as f:
+                    pool_data = json.load(f)
+                first_board_stocks = pool_data.get('first_board_stocks', [])
+            else:
+                # 如果没有对应的pool文件，使用传统的扫描方式，但限制数量
+                csv_files = glob.glob(os.path.join(DATA_PATH, "*.csv"))
+                first_board_stocks = []
+                for file_path in csv_files[:max_stocks]:
+                    stock_code = os.path.basename(file_path).replace('.csv', '')
+                    first_board_stocks.append(stock_code)
+        except Exception as e:
+            logger.error(f'加载股票池数据失败: {e}')
+            # 如果加载失败，使用传统的扫描方式
+            csv_files = glob.glob(os.path.join(DATA_PATH, "*.csv"))
+            first_board_stocks = []
+            for file_path in csv_files[:max_stocks]:
+                stock_code = os.path.basename(file_path).replace('.csv', '')
+                first_board_stocks.append(stock_code)
         
         # 按策略分类的股票列表
         sbgk_stocks = []  # 首板高开
         sbdk_stocks = []  # 首板低开
         rzq_stocks = []  # 弱转强
         
-        # 只检查前max_stocks只股票以提高性能
-        files_to_check = csv_files[:max_stocks]
-        
-        for file in files_to_check:
-            stock_code = os.path.basename(file).replace('.csv', '')
+        # 只检查股票池中的股票以提高性能
+        for stock_code in first_board_stocks[:max_stocks]:
             try:
+                file = os.path.join(DATA_PATH, f"{stock_code}.csv")
                 df = pd.read_csv(file)
                 # 重命名列以处理中文列名
                 df.rename(columns={
@@ -559,7 +611,7 @@ def fast_screen_stocks():
         criteria = request.json
         target_date = criteria.get('date', datetime.now().strftime('%Y-%m-%d'))  # 使用前端传递的日期
         
-        # 动态导入select_2026_01_12_optimized模块
+        # 动态导入select_2026_01_12模块
         try:
             import sys
             import os
@@ -568,10 +620,10 @@ def fast_screen_stocks():
             if selection_path not in sys.path:
                 sys.path.insert(0, selection_path)
             
-            selection_module = __import__('select_2026_01_12_optimized', fromlist=['TodayStockSelectorOptimized'])
-            TodayStockSelectorOptimized = getattr(selection_module, 'TodayStockSelectorOptimized')
+            selection_module = __import__('select_2026_01_12', fromlist=['TodayStockSelector'])
+            TodayStockSelector = getattr(selection_module, 'TodayStockSelector')
             
-            selector = TodayStockSelectorOptimized()
+            selector = TodayStockSelector()
             
             # 读取指定日期的pool数据
             pool_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'full_stock_data', 'pool_data', f'pool_{target_date}.json')
@@ -602,16 +654,16 @@ def fast_screen_stocks():
                     'rzq_count': rzq_count,
                     'execution_time': execution_time
                 },
-                'source': 'select_2026_01_12_optimized'
+                'source': 'select_2026_01_12'
             })
         except ImportError as e:
-            logger.error(f'无法导入select_2026_01_12_optimized模块: {e}')
-            return jsonify({'error': '无法导入select_2026_01_12_optimized模块，请确保select_2026_01_12_optimized.py文件存在'}), 500
+            logger.error(f'无法导入select_2026_01_12模块: {e}')
+            return jsonify({'error': '无法导入select_2026_01_12模块，请确保select_2026_01_12.py文件存在'}), 500
         except Exception as e:
-            logger.error(f'使用select_2026_01_12_optimized选股过程中出错: {e}')
+            logger.error(f'使用select_2026_01_12选股过程中出错: {e}')
             import traceback
             traceback.print_exc()
-            return jsonify({'error': f'使用select_2026_01_12_optimized选股执行出错: {str(e)}'}), 500
+            return jsonify({'error': f'使用select_2026_01_12选股执行出错: {str(e)}'}), 500
     except Exception as e:
         logger.error(f'快速选股API出错: {e}')
         return jsonify({'error': str(e)}), 500
@@ -630,7 +682,7 @@ def load_and_filter_stock_pool(date_str):
     DATA_PATH = os.path.join(os.path.dirname(__file__), 'full_stock_data', 'daily_data')
     
     # 加载pool_data中的首板股票
-    pool_data_dir = os.path.join(os.path.dirname(__file__), 'full_stock_data', 'pool_data')
+    pool_data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'full_stock_data', 'pool_data')
     pool_file = os.path.join(pool_data_dir, f"pool_{date_str}.json")
     
     if not os.path.exists(pool_file):
@@ -833,7 +885,7 @@ def get_data_status():
         from datetime import datetime
         import pandas as pd
         
-        daily_data_dir = os.path.join(os.path.dirname(__file__), 'full_stock_data', 'daily_data')
+        daily_data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'full_stock_data', 'daily_data')
         
         if not os.path.exists(daily_data_dir):
             return jsonify({
@@ -924,6 +976,13 @@ def get_trade_data():
 def update_today_data():
     """增量更新今日数据"""
     try:
+        import sys
+        import os
+        # 添加data_processing目录到Python路径
+        data_proc_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data_processing')
+        if data_proc_path not in sys.path:
+            sys.path.insert(0, data_proc_path)
+        
         from incremental_download import IncrementalDataDownloader
         
         # 创建下载器实例
@@ -948,8 +1007,8 @@ def update_today_data():
                 # 增量更新这只股票
                 try:
                     # 使用更安全的方式调用更新函数
-                    result = downloader.update_stock_data(stock, days=1)  # 只更新1天
-                    if result:
+                    result = downloader.update_single_stock_data(stock, days=1)  # 只更新1天
+                    if result[0]:  # 检查返回结果的第一个元素是否为True
                         success_count += 1
                     else:
                         fail_count += 1
@@ -978,6 +1037,13 @@ def update_today_data():
 def generate_stock_pool():
     """生成股票池"""
     try:
+        import sys
+        import os
+        # 添加data_processing目录到Python路径
+        data_proc_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data_processing')
+        if data_proc_path not in sys.path:
+            sys.path.insert(0, data_proc_path)
+        
         from stock_pool_generator import StockPoolGenerator
         
         data = request.json
@@ -1002,6 +1068,13 @@ def generate_stock_pool():
 def load_stock_pool():
     """加载股票池"""
     try:
+        import sys
+        import os
+        # 添加data_processing目录到Python路径
+        data_proc_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data_processing')
+        if data_proc_path not in sys.path:
+            sys.path.insert(0, data_proc_path)
+        
         from stock_pool_generator import StockPoolGenerator
         
         date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))

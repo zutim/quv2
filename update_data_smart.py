@@ -20,7 +20,7 @@ def get_trade_days(end_date, count):
     days = []
     curr = end_date
     while len(days) < count:
-        if curr.weekday() <= 4:
+        if curr.weekday() <= 4:  # 工作日（周一到周五）
             days.append(curr)
         curr -= timedelta(days=1)
     return days
@@ -36,16 +36,25 @@ def update_smart():
     target_stocks = set()
     
     today = datetime.now().date()
-    # We need T-1, T-2, T-3
-    # Assuming today is T (or T+1 if before market)
-    # If running at 11:00, today is T. Yesterday is T-1.
     
-    # Let's just fetch last 5 days limit ups to be safe
-    days = get_trade_days(today - timedelta(days=1), 5)
+    # 包含今天在内的最近交易日
+    # 先检查今天是否为交易日
+    is_today_trading_day = today.weekday() < 5  # 周一到周五为交易日
     
-    print(f"Checking limit ups for: {days}")
+    # 获取包括今天在内的最近5个交易日
+    trade_days = []
     
-    for d in days:
+    # 如果今天是交易日，加入今天的数据获取
+    if is_today_trading_day:
+        trade_days.append(today)
+    
+    # 再加上之前的交易日
+    prev_days = get_trade_days(today - timedelta(days=1), 5)
+    trade_days.extend(prev_days)
+    
+    print(f"Checking limit ups for: {trade_days}")
+    
+    for d in trade_days:
         d_str = d.strftime("%Y%m%d")
         try:
             # Limit Up Pool
